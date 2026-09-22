@@ -86,55 +86,16 @@ impl Extension for ExtensionStruct {
             ListenerPriority::Normal,
             |server, _options, state, _transaction| {
                 Box::pin(async move {
-                    let subdomains =
-                        db::Subdomain::all_by_server_uuid_plain(&state.database, server.uuid).await;
-                    let subdomains = match subdomains {
-                        Ok(subdomains) => subdomains,
-                        Err(err) => {
-                            tracing::warn!(
-                                server = %server.uuid,
-                                "failed to load subdomains for dns cleanup: {err:?}"
-                            );
-                            return Ok(());
+                    match db::Subdomain::all_by_server_uuid_plain(&state.database, server.uuid)
+                        .await
+                    {
+                        Ok(subdomains) => {
+                            delete_dns_records(state, server.uuid, &subdomains).await;
                         }
-                    };
-
-                    let mut domains: HashMap<uuid::Uuid, Option<db::Domain>> = HashMap::new();
-                    for subdomain in &subdomains {
-                        let domain = match domains.entry(subdomain.domain_uuid) {
-                            std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
-                            std::collections::hash_map::Entry::Vacant(entry) => entry.insert(
-                                db::Domain::by_uuid(&state.database, subdomain.domain_uuid)
-                                    .await
-                                    .unwrap_or(None),
-                            ),
-                        };
-                        let Some(domain) = domain else {
-                            continue;
-                        };
-
-                        let provider = match domain.provider_client(&state.database).await {
-                            Ok(provider) => provider,
-                            Err(err) => {
-                                tracing::warn!(
-                                    server = %server.uuid,
-                                    domain = %domain.domain,
-                                    "failed to build dns provider for subdomain cleanup: {err:?}"
-                                );
-                                continue;
-                            }
-                        };
-
-                        for record in subdomain.records.iter() {
-                            if let Err(err) = provider.delete_record(&record.id).await {
-                                tracing::warn!(
-                                    server = %server.uuid,
-                                    subdomain = %subdomain.name,
-                                    record = %record.id,
-                                    "failed to delete dns record: {err:?}"
-                                );
-                            }
-                        }
+                        Err(err) => tracing::warn!(
+                            server = %server.uuid,
+                            "failed to load subdomains for dns cleanup: {err:?}"
+                        ),
                     }
 
                     Ok(())
@@ -142,21 +103,16 @@ impl Extension for ExtensionStruct {
             },
         );
 
-        // Transfer: allocations stay on the old node, so records must be
-        // re-created by an admin - clear allocation_uuid so the UI can flag it.
+        // Transfer: the records still point at the old node, so remove them and
+        // clear the allocation; the user re-points the subdomain to a new one.
         Server::register_event_handler(|state, event| async move {
             if let ServerEvent::TransferCompleted {
                 server,
                 successful: true,
                 ..
             } = &*event
-                && let Err(err) =
-                    db::Subdomain::clear_allocations_by_server(&state.database, server.uuid).await
             {
-                tracing::warn!(
-                    server = %server.uuid,
-                    "failed to clear subdomain allocations after transfer: {err:?}"
-                );
+                release_after_transfer(&state, server.uuid).await;
             }
             Ok(())
         });
@@ -243,5 +199,90 @@ impl Extension for ExtensionStruct {
 
     async fn settings_deserializer(&self, _state: State) -> ExtensionSettingsDeserializer {
         Arc::new(settings::ExtensionSettingsDataDeserializer)
+    }
+}
+
+/// Deletes the DNS records of the given subdomains at their providers. Returns,
+/// per subdomain, the records that could not be deleted.
+async fn delete_dns_records(
+    state: &State,
+    server: uuid::Uuid,
+    subdomains: &[db::Subdomain],
+) -> HashMap<uuid::Uuid, Vec<providers::StoredRecord>> {
+    let mut domains: HashMap<uuid::Uuid, Option<db::Domain>> = HashMap::new();
+    let mut remaining = HashMap::new();
+
+    for subdomain in subdomains {
+        let domain = match domains.entry(subdomain.domain_uuid) {
+            std::collections::hash_map::Entry::Occupied(entry) => entry.into_mut(),
+            std::collections::hash_map::Entry::Vacant(entry) => entry.insert(
+                db::Domain::by_uuid(&state.database, subdomain.domain_uuid)
+                    .await
+                    .unwrap_or(None),
+            ),
+        };
+        let Some(domain) = domain else {
+            remaining.insert(subdomain.uuid, subdomain.records.to_vec());
+            continue;
+        };
+
+        let provider = match domain.provider_client(&state.database).await {
+            Ok(provider) => provider,
+            Err(err) => {
+                tracing::warn!(
+                    server = %server,
+                    domain = %domain.domain,
+                    "failed to build dns provider for subdomain cleanup: {err:?}"
+                );
+                remaining.insert(subdomain.uuid, subdomain.records.to_vec());
+                continue;
+            }
+        };
+
+        let mut left = Vec::new();
+        for record in subdomain.records.iter() {
+            if let Err(err) = provider.delete_record(&record.id).await {
+                tracing::warn!(
+                    server = %server,
+                    subdomain = %subdomain.name,
+                    record = %record.id,
+                    "failed to delete dns record: {err:?}"
+                );
+                left.push(record.clone());
+            }
+        }
+        remaining.insert(subdomain.uuid, left);
+    }
+
+    remaining
+}
+
+/// Records that failed to delete are kept, so re-pointing the subdomain later
+/// retries them instead of leaving them behind at the provider.
+async fn release_after_transfer(state: &State, server: uuid::Uuid) {
+    let subdomains = match db::Subdomain::all_by_server_uuid_plain(&state.database, server).await {
+        Ok(subdomains) => subdomains,
+        Err(err) => {
+            tracing::warn!(
+                server = %server,
+                "failed to load subdomains after transfer: {err:?}"
+            );
+            return;
+        }
+    };
+
+    let mut remaining = delete_dns_records(state, server, &subdomains).await;
+    for mut subdomain in subdomains {
+        let left = remaining.remove(&subdomain.uuid).unwrap_or_default();
+        if let Err(err) = subdomain
+            .update_allocation_and_records(&state.database, None, &left)
+            .await
+        {
+            tracing::warn!(
+                server = %server,
+                subdomain = %subdomain.name,
+                "failed to reset subdomain after transfer: {err:?}"
+            );
+        }
     }
 }

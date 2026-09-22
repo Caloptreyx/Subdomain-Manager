@@ -381,21 +381,6 @@ impl Subdomain {
         Ok(())
     }
 
-    /// Clears the allocation on all of a server's subdomains (transfer).
-    pub async fn clear_allocations_by_server(
-        database: &Database,
-        server_uuid: Uuid,
-    ) -> Result<(), sqlx::Error> {
-        sqlx::query(
-            "UPDATE dev_caloptreyx_subdomains_subdomains
-             SET allocation_uuid = NULL WHERE server_uuid = $1",
-        )
-        .bind(server_uuid)
-        .execute(database.write())
-        .await?;
-        Ok(())
-    }
-
     pub async fn delete_by_domain_uuid(
         database: &Database,
         domain_uuid: Uuid,

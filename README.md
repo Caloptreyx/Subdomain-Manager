@@ -19,9 +19,10 @@ Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
 - **Blacklist** subdomain names with regular expressions.
 - **Per-server subdomain limit** exposed as `feature_limits.subdomains` and editable in the admin
   server create/update forms.
-- **Proper cleanup**: DNS records are removed when a subdomain or its server is deleted.
-- **Allocation changes at any time**; the allocation is set to `null` (Unknown) after a server
-  transfer so the user can re-point it.
+- **Proper cleanup**: DNS records are removed when a subdomain or its server is deleted, and when
+  a server is transferred to another node.
+- **Allocation changes at any time**; after a server transfer the allocation is set to `null`
+  (Unknown) so the user can re-point the subdomain, which creates new records.
 - Admin overview of every subdomain across the panel, with search.
 
 ## Installation
