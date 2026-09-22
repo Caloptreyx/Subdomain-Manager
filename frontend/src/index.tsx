@@ -23,7 +23,9 @@ class CaloptreyxSubdomainsExtension extends Extension {
     );
 
     ctx.extensionRegistry.enterPermissionIcons((icons) =>
-      icons.addServerPermissionIcon('subdomains', <FontAwesomeIcon icon={faGlobe} />),
+      icons
+        .addServerPermissionIcon('subdomains', <FontAwesomeIcon icon={faGlobe} />)
+        .addAdminPermissionIcon('subdomains', <FontAwesomeIcon icon={faGlobe} />),
     );
 
     ctx.extensionRegistry.enterForms((forms) => {

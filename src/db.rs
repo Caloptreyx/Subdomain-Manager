@@ -323,6 +323,18 @@ impl Subdomain {
         .await
     }
 
+    pub async fn all_by_allocation_uuid(
+        database: &Database,
+        allocation_uuid: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as::<_, Self>(
+            "SELECT * FROM dev_caloptreyx_subdomains_subdomains WHERE allocation_uuid = $1",
+        )
+        .bind(allocation_uuid)
+        .fetch_all(database.read())
+        .await
+    }
+
     pub async fn by_domain_and_name(
         database: &Database,
         domain_uuid: Uuid,
