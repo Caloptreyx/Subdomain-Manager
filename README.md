@@ -26,7 +26,8 @@ Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
 
 ## Installation
 
-Download `dev_caloptreyx_subdomains.c7s.zip` and either upload it under **Admin → Extensions**
+Download `dev_caloptreyx_subdomains.c7s.zip` from the
+[latest release](https://github.com/Caloptreyx/Subdomain-Manager/releases/latest) and either upload it under **Admin → Extensions**
 or drop it into your heavy image's `build/extensions/` directory and `docker compose restart web`.
 Extensions require the `:heavy` panel image (or a dev environment) — see the
 [Calagopus docs](https://calagopus.com/docs/panel/extensions/installing-extensions).
