@@ -47,6 +47,21 @@ Extensions require the `:heavy` panel image (or a dev environment) — see the
 
 Permissions: server `subdomains.read|create|update|delete`, admin `subdomains.read|manage`.
 
+## Screenshots
+
+**Domains** – the DNS zones users can create subdomains on, with provider, status and usage.
+
+![Admin domains tab](docs/screenshots/admin-domains.png)
+
+**Settings** – name blacklist, default subdomain limit, default record templates and per-egg
+overrides.
+
+![Admin settings tab](docs/screenshots/admin-settings.png)
+
+**Subdomains** – every subdomain across the panel with its server and allocation.
+
+![Admin subdomains tab](docs/screenshots/admin-subdomains.png)
+
 ## API
 
 - `GET|POST /api/client/servers/{server}/subdomains`, `PATCH|DELETE .../subdomains/{uuid}`
