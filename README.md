@@ -56,26 +56,6 @@ Permissions: server `subdomains.read|create|update|delete`, admin `subdomains.re
 
 Full schemas are in the panel's OpenAPI document once installed.
 
-## Development
-
-The extension has to live inside a checkout of the panel repository
-(`backend-extensions/dev_caloptreyx_subdomains`, a symlink to this repo works):
-
-```bash
-# from the panel repo root
-SQLX_OFFLINE=true cargo check -p dev_caloptreyx_subdomains
-SQLX_OFFLINE=true cargo clippy -p dev_caloptreyx_subdomains
-SQLX_OFFLINE=true cargo test -p dev_caloptreyx_subdomains
-cd frontend && pnpm build:ci && cd ..
-SQLX_OFFLINE=true panel-rs extensions export dev.caloptreyx.subdomains  # -> exported-extensions/
-```
-
-Notes:
-- `frontend/tsconfig.json` lists two `@/*` path fallbacks so the build works both in-tree and when
-  the extension directory is symlinked from elsewhere.
-- Do not run `panel-rs extensions resync` while the extension directory is a symlink; the panel
-  skips symlinked entries and would drop the extension from its internal list.
-
 ## Roadmap
 
 - CLI command to migrate data from the Pterodactyl subdomain manager extension.
