@@ -64,20 +64,41 @@ async fn create_dns_records(
     Ok(created)
 }
 
-/// Whether the Reverse Proxy Manager extension already serves `fqdn`.
-async fn used_by_reverse_proxy(state: &State, fqdn: &str) -> Result<bool, anyhow::Error> {
-    let installed: Option<String> =
+/// Whether the Reverse Proxy Manager extension is installed (its table
+/// exists).
+async fn reverse_proxy_installed(state: &State) -> Result<bool, anyhow::Error> {
+    let table: Option<String> =
         sqlx::query_scalar("SELECT to_regclass('dev_caloptreyx_reverseproxy_proxies')::text")
             .fetch_one(state.database.read())
             .await?;
-    if installed.is_none() {
+    Ok(table.is_some())
+}
+
+/// Whether the Reverse Proxy Manager extension already serves `fqdn`.
+async fn used_by_reverse_proxy(state: &State, fqdn: &str) -> Result<bool, anyhow::Error> {
+    if !reverse_proxy_installed(state).await? {
         return Ok(false);
     }
-
     Ok(sqlx::query_scalar(
         "SELECT EXISTS(SELECT 1 FROM dev_caloptreyx_reverseproxy_proxies WHERE domain = $1)",
     )
     .bind(fqdn)
+    .fetch_one(state.database.read())
+    .await?)
+}
+
+/// Number of Reverse Proxy Manager proxies created on a managed domain.
+pub async fn reverse_proxies_on_domain(
+    state: &State,
+    domain_uuid: uuid::Uuid,
+) -> Result<i64, anyhow::Error> {
+    if !reverse_proxy_installed(state).await? {
+        return Ok(0);
+    }
+    Ok(sqlx::query_scalar(
+        "SELECT COUNT(*) FROM dev_caloptreyx_reverseproxy_proxies WHERE managed_domain_uuid = $1",
+    )
+    .bind(domain_uuid)
     .fetch_one(state.database.read())
     .await?)
 }

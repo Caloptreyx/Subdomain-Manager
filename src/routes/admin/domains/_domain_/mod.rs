@@ -250,6 +250,18 @@ mod delete {
     ) -> ApiResponseResult {
         permissions.has_admin_permission("subdomains.manage")?;
 
+        // proxies keep DNS records on this domain that only the Reverse
+        // Proxy Manager can clean up - force doesn't cover them
+        let proxy_count = crate::service::reverse_proxies_on_domain(&state, domain.uuid).await?;
+        if proxy_count > 0 {
+            return ApiResponse::error(format!(
+                "{proxy_count} reverse prox{} still use this domain, delete them in the Reverse Proxy Manager first",
+                if proxy_count == 1 { "y" } else { "ies" }
+            ))
+            .with_status(StatusCode::CONFLICT)
+            .ok();
+        }
+
         let subdomain_count = Subdomain::count_by_domain_uuid(&state.database, domain.uuid).await?;
         if subdomain_count > 0 && !params.force {
             return ApiResponse::error(format!(
