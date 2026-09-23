@@ -20,6 +20,7 @@ mod model;
 mod providers;
 mod records;
 mod routes;
+mod service;
 mod settings;
 
 #[derive(Default)]

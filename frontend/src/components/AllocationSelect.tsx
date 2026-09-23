@@ -1,5 +1,6 @@
 import { SelectProps } from '@mantine/core';
 import { z } from 'zod';
+import getServerAllocations from '@/api/admin/servers/allocations/getServerAllocations.ts';
 import getAllocations from '@/api/server/allocations/getAllocations.ts';
 import Select from '@/elements/input/Select.tsx';
 import { serverAllocationSchema } from '@/lib/schemas/server/allocations.ts';
@@ -10,16 +11,18 @@ type Allocation = z.infer<typeof serverAllocationSchema>;
 
 type Props = Omit<SelectProps, 'data' | 'value' | 'onChange'> & {
   serverUuid: string;
+  /** Load allocations through the admin API (for the admin pages). */
+  admin?: boolean;
   value: string | null;
   onChange: (uuid: string | null, allocation: Allocation | null) => void;
 };
 
-export default function AllocationSelect({ serverUuid, value, onChange, ...rest }: Props) {
+export default function AllocationSelect({ serverUuid, admin = false, value, onChange, ...rest }: Props) {
   const { t: tExt } = useExtTranslations();
 
   const allocations = useSearchableResource<Allocation>({
-    queryKey: ['dev.caloptreyx.subdomains', 'server', serverUuid, 'allocations'],
-    fetcher: (search) => getAllocations(serverUuid, 1, search),
+    queryKey: ['dev.caloptreyx.subdomains', admin ? 'admin' : 'server', serverUuid, 'allocations'],
+    fetcher: (search) => (admin ? getServerAllocations(serverUuid, 1, search) : getAllocations(serverUuid, 1, search)),
   });
 
   const known = new Map<string, Allocation>();

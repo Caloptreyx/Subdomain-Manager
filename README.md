@@ -43,7 +43,10 @@ Extensions require the `:heavy` panel image (or a dev environment) — see the
   Credentials are verified against the provider before saving and stored encrypted.
 - **Settings** – blacklist regexes, default subdomain limit for new servers, default record
   templates and per-egg overrides. A TTL of `0` means "provider automatic".
-- **Subdomains** – searchable list of all subdomains with their servers.
+- **Subdomains** – searchable list of all subdomains with their servers. Admins can create
+  subdomains on any server (not bound by the server limit or the name blacklist), move a subdomain
+  to another allocation of its server, and delete it (with a forced delete if the DNS provider
+  fails).
 
 Permissions: server `subdomains.read|create|update|delete`, admin `subdomains.read|manage`.
 
@@ -58,7 +61,8 @@ overrides.
 
 ![Admin settings tab](docs/screenshots/admin-settings.png)
 
-**Subdomains** – every subdomain across the panel with its server and allocation.
+**Subdomains** – every subdomain across the panel with its server and allocation, and admin
+create / change allocation / delete actions.
 
 ![Admin subdomains tab](docs/screenshots/admin-subdomains.png)
 
@@ -67,7 +71,8 @@ overrides.
 - `GET|POST /api/client/servers/{server}/subdomains`, `PATCH|DELETE .../subdomains/{uuid}`
 - `GET|PUT /api/admin/extensions/dev.caloptreyx.subdomains/settings`
 - `GET|POST .../domains`, `PATCH|DELETE .../domains/{uuid}`, `POST .../domains/{uuid}/verify`
-- `GET .../subdomains?page&per_page&search`
+- `GET|POST .../subdomains` (list with `page&per_page&search`, admin create),
+  `PATCH|DELETE .../subdomains/{uuid}`
 
 Full schemas are in the panel's OpenAPI document once installed.
 

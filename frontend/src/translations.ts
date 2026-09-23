@@ -169,6 +169,8 @@ const translations = defineTranslations({
           },
           subdomains: {
             empty: 'No subdomains exist yet.',
+            createNotice:
+              'Admins can create subdomains on any server. The server limit and the name blacklist do not apply.',
             search: 'Search subdomains…',
             table: {
               columns: {

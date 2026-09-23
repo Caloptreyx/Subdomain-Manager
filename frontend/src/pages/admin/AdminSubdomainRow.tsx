@@ -1,52 +1,38 @@
 import { faLink, faTrash } from '@fortawesome/free-solid-svg-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-
-import CopyOnClick from '@/elements/CopyOnClick.tsx';
 import Badge from '@/elements/data-display/Badge.tsx';
 import { TableData, TableRow } from '@/elements/data-display/Table.tsx';
-import Stack from '@/elements/layout/Stack.tsx';
+import TableLink from '@/elements/data-display/TableLink.tsx';
 import ContextMenu, { ContextMenuToggle } from '@/elements/overlays/ContextMenu.tsx';
-import Tooltip from '@/elements/overlays/Tooltip.tsx';
 import FormattedTimestamp from '@/elements/time/FormattedTimestamp.tsx';
 import Code from '@/elements/typography/Code.tsx';
-import { useServerCan } from '@/plugins/usePermissions.ts';
+import { useAdminCan } from '@/plugins/usePermissions.ts';
 import { useToast } from '@/providers/ToastProvider.tsx';
-import deleteSubdomain from '../../api/server/deleteSubdomain.ts';
-import updateSubdomain from '../../api/server/updateSubdomain.ts';
-import type { Subdomain } from '../../lib/schemas.ts';
+import deleteSubdomain from '../../api/admin/deleteSubdomain.ts';
+import updateSubdomain from '../../api/admin/updateSubdomain.ts';
+import type { AdminSubdomain } from '../../lib/schemas.ts';
 import { useExtTranslations } from '../../translations.ts';
-import SubdomainAllocationModal from './modals/SubdomainAllocationModal.tsx';
-import SubdomainDeleteModal from './modals/SubdomainDeleteModal.tsx';
-import { serverSubdomainsQueryKey } from './ServerSubdomainsPage.tsx';
+import SubdomainAllocationModal from '../server/modals/SubdomainAllocationModal.tsx';
+import SubdomainDeleteModal from '../server/modals/SubdomainDeleteModal.tsx';
 
-export default function SubdomainRow({
+export default function AdminSubdomainRow({
   subdomain,
-  serverUuid,
   onChanged,
 }: {
-  subdomain: Subdomain;
-  serverUuid: string;
+  subdomain: AdminSubdomain;
   onChanged: () => void;
 }) {
   const { t: tExt } = useExtTranslations();
   const { addToast } = useToast();
-  const queryClient = useQueryClient();
+  const canManage = useAdminCan('subdomains.manage');
 
   const [openModal, setOpenModal] = useState<'allocation' | 'delete' | null>(null);
-  const canUpdate = useServerCan('subdomains.update');
-  const canDelete = useServerCan('subdomains.delete');
-
-  const refresh = () => {
-    onChanged();
-    queryClient.invalidateQueries({ queryKey: serverSubdomainsQueryKey(serverUuid) });
-  };
 
   const doDelete = async (force: boolean): Promise<void> => {
-    await deleteSubdomain(serverUuid, subdomain.uuid, force);
+    await deleteSubdomain(subdomain.uuid, force);
     addToast(tExt('pages.server.subdomains.toast.deleted', {}), 'success');
     setOpenModal(null);
-    refresh();
+    onChanged();
   };
 
   return (
@@ -54,10 +40,11 @@ export default function SubdomainRow({
       <SubdomainAllocationModal
         opened={openModal === 'allocation'}
         onClose={() => setOpenModal(null)}
-        serverUuid={serverUuid}
+        serverUuid={subdomain.server.uuid}
         subdomain={subdomain}
-        update={(allocationUuid) => updateSubdomain(serverUuid, subdomain.uuid, { allocationUuid })}
-        onChanged={refresh}
+        admin
+        update={(allocationUuid) => updateSubdomain(subdomain.uuid, allocationUuid)}
+        onChanged={onChanged}
       />
       <SubdomainDeleteModal
         opened={openModal === 'delete'}
@@ -74,7 +61,7 @@ export default function SubdomainRow({
             label: tExt('pages.server.subdomains.button.changeAllocation', {}),
             onClick: () => setOpenModal('allocation'),
             color: 'gray',
-            canAccess: canUpdate,
+            canAccess: canManage,
           },
           {
             type: 'action',
@@ -82,7 +69,7 @@ export default function SubdomainRow({
             label: tExt('pages.server.subdomains.button.delete', {}),
             onClick: () => setOpenModal('delete'),
             color: 'red',
-            canAccess: canDelete,
+            canAccess: canManage,
           },
         ]}
       >
@@ -94,9 +81,11 @@ export default function SubdomainRow({
             }}
           >
             <TableData>
-              <CopyOnClick content={subdomain.fqdn}>
-                <Code>{subdomain.fqdn}</Code>
-              </CopyOnClick>
+              <Code>{subdomain.fqdn}</Code>
+            </TableData>
+
+            <TableData>
+              <TableLink to={`/admin/servers/${subdomain.server.uuid}`}>{subdomain.server.name}</TableLink>
             </TableData>
 
             <TableData>
@@ -105,27 +94,8 @@ export default function SubdomainRow({
                   {subdomain.allocation.ipAlias ?? subdomain.allocation.ip}:{subdomain.allocation.port}
                 </Code>
               ) : (
-                <Tooltip label={tExt('pages.server.subdomains.tooltip.unknownAllocation', {})}>
-                  <Badge color='yellow'>{tExt('pages.server.subdomains.badge.unknown', {})}</Badge>
-                </Tooltip>
+                <Badge color='yellow'>{tExt('pages.server.subdomains.badge.unknown', {})}</Badge>
               )}
-            </TableData>
-
-            <TableData>
-              <Tooltip
-                label={
-                  <Stack gap={2}>
-                    {subdomain.records.map((record, index) => (
-                      <Code key={index}>
-                        {record.recordType} {record.name} -&gt; {record.content}
-                      </Code>
-                    ))}
-                    {subdomain.records.length === 0 && <Code>-</Code>}
-                  </Stack>
-                }
-              >
-                <Badge color='gray'>{subdomain.records.length}</Badge>
-              </Tooltip>
             </TableData>
 
             <TableData>

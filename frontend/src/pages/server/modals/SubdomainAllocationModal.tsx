@@ -8,7 +8,6 @@ import { ModalFooter } from '@/elements/modals/Modal.tsx';
 import Text from '@/elements/typography/Text.tsx';
 import { useToast } from '@/providers/ToastProvider.tsx';
 import { useTranslations } from '@/providers/TranslationProvider.tsx';
-import updateSubdomain from '../../../api/server/updateSubdomain.ts';
 import AllocationSelect from '../../../components/AllocationSelect.tsx';
 import type { Subdomain } from '../../../lib/schemas.ts';
 import { useExtTranslations } from '../../../translations.ts';
@@ -16,11 +15,15 @@ import { useExtTranslations } from '../../../translations.ts';
 export default function SubdomainAllocationModal({
   serverUuid,
   subdomain,
+  admin = false,
+  update,
   onChanged,
   ...props
 }: ModalProps & {
   serverUuid: string;
   subdomain: Subdomain;
+  admin?: boolean;
+  update: (allocationUuid: string) => Promise<unknown>;
   onChanged: () => void;
 }) {
   const { t } = useTranslations();
@@ -41,7 +44,7 @@ export default function SubdomainAllocationModal({
     setLoading(true);
 
     try {
-      await updateSubdomain(serverUuid, subdomain.uuid, { allocationUuid });
+      await update(allocationUuid);
       addToast(tExt('pages.server.subdomains.toast.updated', {}), 'success');
       onChanged();
       props.onClose();
@@ -69,6 +72,7 @@ export default function SubdomainAllocationModal({
           withAsterisk
           label={tExt('pages.server.subdomains.modal.create.allocation', {})}
           serverUuid={serverUuid}
+          admin={admin}
           value={allocationUuid}
           onChange={setAllocationUuid}
         />

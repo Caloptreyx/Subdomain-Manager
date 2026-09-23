@@ -53,10 +53,8 @@ pub async fn auth(
 
 mod patch {
     use crate::{
-        db::{ApiSubdomain, Domain, Subdomain},
-        records,
-        routes::server::create_dns_records,
-        settings::ExtensionSettingsData,
+        db::{ApiSubdomain, Subdomain},
+        service,
     };
     use axum::http::StatusCode;
     use garde::Validate;
@@ -65,7 +63,6 @@ mod patch {
         ApiError, GetState,
         models::{
             server::{GetServer, GetServerActivityLogger},
-            server_allocation::ServerAllocation,
             user::GetPermissionManager,
         },
         response::{ApiResponse, ApiResponseResult},
@@ -118,92 +115,7 @@ mod patch {
 
         permissions.has_server_permission("subdomains.update")?;
 
-        let allocation = match ServerAllocation::by_server_uuid_uuid(
-            &state.database,
-            server.uuid,
-            data.allocation_uuid,
-        )
-        .await?
-        {
-            Some(allocation) => allocation,
-            None => {
-                return ApiResponse::error("allocation does not belong to this server")
-                    .with_status(StatusCode::BAD_REQUEST)
-                    .ok();
-            }
-        };
-
-        let domain = match Domain::by_uuid(&state.database, subdomain.domain_uuid).await? {
-            Some(domain) => domain,
-            None => {
-                return ApiResponse::error("domain no longer exists")
-                    .with_status(StatusCode::BAD_REQUEST)
-                    .ok();
-            }
-        };
-
-        let target = match records::resolve_target(&allocation.allocation) {
-            Ok(target) => target,
-            Err(err) => return ApiResponse::from(err).ok(),
-        };
-
-        let extension = state
-            .settings
-            .get()
-            .await?
-            .find_extension_settings::<ExtensionSettingsData>()
-            .cloned()
-            .unwrap_or_default();
-
-        let vars = records::Vars {
-            name: subdomain.name.clone(),
-            domain: domain.domain.clone(),
-            ip: target.content(),
-            port: allocation.allocation.port,
-            server: server.uuid,
-            server_name: server.name.to_string(),
-        };
-        let record_inputs = match records::render_records(
-            extension.records_for_egg(server.egg.uuid),
-            &vars,
-            &target,
-        ) {
-            Ok(records) => records,
-            Err(err) => {
-                return ApiResponse::error(err.to_string())
-                    .with_status(StatusCode::BAD_REQUEST)
-                    .ok();
-            }
-        };
-
-        let provider = match domain.provider_client(&state.database).await {
-            Ok(provider) => provider,
-            Err(err) => return ApiResponse::from(err).ok(),
-        };
-
-        // swap the records: delete the old set (best effort), create the new
-        for record in subdomain.records.iter() {
-            if let Err(err) = provider.delete_record(&record.id).await {
-                tracing::warn!(
-                    subdomain = %subdomain.name,
-                    record = %record.id,
-                    "failed to delete old dns record: {err:?}"
-                );
-            }
-        }
-
-        let stored_records = match create_dns_records(&*provider, &record_inputs).await {
-            Ok(stored) => stored,
-            Err(err) => {
-                return ApiResponse::error(format!("failed to create dns records: {err}"))
-                    .with_status(StatusCode::BAD_REQUEST)
-                    .ok();
-            }
-        };
-
-        subdomain
-            .update_allocation_and_records(&state.database, Some(allocation.uuid), &stored_records)
-            .await?;
+        service::change_allocation(&state, &server, &mut subdomain, data.allocation_uuid).await?;
 
         let api_subdomain = Subdomain::by_uuid_joined(&state.database, subdomain.uuid)
             .await?
@@ -217,7 +129,7 @@ mod patch {
                     "uuid": subdomain.uuid,
                     "name": subdomain.name,
                     "fqdn": api_subdomain.fqdn,
-                    "allocation_uuid": allocation.uuid,
+                    "allocation_uuid": data.allocation_uuid,
                 }),
             )
             .await;
@@ -230,8 +142,8 @@ mod patch {
 }
 
 mod delete {
-    use crate::db::Domain;
-    use axum::{extract::Query, http::StatusCode};
+    use crate::service;
+    use axum::extract::Query;
     use serde::{Deserialize, Serialize};
     use shared::{
         ApiError, GetState,
@@ -286,39 +198,7 @@ mod delete {
     ) -> ApiResponseResult {
         permissions.has_server_permission("subdomains.delete")?;
 
-        if let Some(domain) = Domain::by_uuid(&state.database, subdomain.domain_uuid).await? {
-            match domain.provider_client(&state.database).await {
-                Ok(provider) => {
-                    for record in subdomain.records.iter() {
-                        if let Err(err) = provider.delete_record(&record.id).await {
-                            if !params.force {
-                                return ApiResponse::error(format!(
-                                    "failed to delete dns record: {err}"
-                                ))
-                                .with_status(StatusCode::BAD_GATEWAY)
-                                .ok();
-                            }
-                            tracing::warn!(
-                                subdomain = %subdomain.name,
-                                record = %record.id,
-                                "force-deleting subdomain despite dns record failure: {err:?}"
-                            );
-                        }
-                    }
-                }
-                Err(err) => {
-                    if !params.force {
-                        return ApiResponse::from(err).ok();
-                    }
-                    tracing::warn!(
-                        subdomain = %subdomain.name,
-                        "force-deleting subdomain despite provider failure: {err:?}"
-                    );
-                }
-            }
-        }
-
-        subdomain.delete(&state.database).await?;
+        service::delete(&state, &subdomain, params.force).await?;
 
         activity_logger
             .log(
@@ -328,6 +208,7 @@ mod delete {
                     "name": subdomain.name,
                     "domain_uuid": subdomain.domain_uuid,
                     "created": subdomain.created,
+                    "forced": params.force,
                 }),
             )
             .await;

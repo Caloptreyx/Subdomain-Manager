@@ -1,20 +1,22 @@
-import { faSearch } from '@fortawesome/free-solid-svg-icons';
+import { faPlus, faSearch } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Center } from '@mantine/core';
-import Badge from '@/elements/data-display/Badge.tsx';
-import Table, { TableData, TableRow } from '@/elements/data-display/Table.tsx';
-import TableLink from '@/elements/data-display/TableLink.tsx';
+import { useState } from 'react';
+import Button from '@/elements/buttons/Button.tsx';
+import { AdminCan } from '@/elements/Can.tsx';
+import Table from '@/elements/data-display/Table.tsx';
 import TextInput from '@/elements/input/TextInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
-import FormattedTimestamp from '@/elements/time/FormattedTimestamp.tsx';
-import Code from '@/elements/typography/Code.tsx';
 import Text from '@/elements/typography/Text.tsx';
 import { useSearchablePaginatedTable } from '@/plugins/resource/useSearchablePaginatedTable.ts';
 import getSubdomains from '../../api/admin/getSubdomains.ts';
 import { useExtTranslations } from '../../translations.ts';
+import AdminSubdomainRow from './AdminSubdomainRow.tsx';
+import AdminSubdomainCreateModal from './modals/AdminSubdomainCreateModal.tsx';
 
 export default function SubdomainsTab() {
   const { t: tExt } = useExtTranslations();
+  const [createOpen, setCreateOpen] = useState(false);
 
   const {
     data: subdomains,
@@ -23,6 +25,7 @@ export default function SubdomainsTab() {
     search,
     setSearch,
     setPage,
+    refetch,
   } = useSearchablePaginatedTable({
     queryKey: ['dev.caloptreyx.subdomains', 'admin', 'subdomains'],
     fetcher: getSubdomains,
@@ -30,6 +33,8 @@ export default function SubdomainsTab() {
 
   return (
     <>
+      <AdminSubdomainCreateModal opened={createOpen} onClose={() => setCreateOpen(false)} onCreated={refetch} />
+
       <Group justify='flex-end' mb='md'>
         <TextInput
           placeholder={tExt('pages.admin.subdomains.subdomains.search', {})}
@@ -38,6 +43,11 @@ export default function SubdomainsTab() {
           leftSection={<FontAwesomeIcon icon={faSearch} />}
           w={280}
         />
+        <AdminCan action='subdomains.manage'>
+          <Button onClick={() => setCreateOpen(true)} color='blue' leftSection={<FontAwesomeIcon icon={faPlus} />}>
+            {tExt('pages.server.subdomains.button.create', {})}
+          </Button>
+        </AdminCan>
       </Group>
 
       <Table
@@ -46,6 +56,7 @@ export default function SubdomainsTab() {
           tExt('pages.admin.subdomains.subdomains.table.columns.server', {}),
           tExt('pages.admin.subdomains.subdomains.table.columns.allocation', {}),
           tExt('pages.admin.subdomains.subdomains.table.columns.created', {}),
+          '',
         ]}
         loading={loading}
         error={error}
@@ -58,29 +69,7 @@ export default function SubdomainsTab() {
         }
       >
         {subdomains?.data.map((subdomain) => (
-          <TableRow key={subdomain.uuid}>
-            <TableData>
-              <Code>{subdomain.fqdn}</Code>
-            </TableData>
-
-            <TableData>
-              <TableLink to={`/admin/servers/${subdomain.server.uuid}`}>{subdomain.server.name}</TableLink>
-            </TableData>
-
-            <TableData>
-              {subdomain.allocation ? (
-                <Code>
-                  {subdomain.allocation.ipAlias ?? subdomain.allocation.ip}:{subdomain.allocation.port}
-                </Code>
-              ) : (
-                <Badge color='yellow'>{tExt('pages.server.subdomains.badge.unknown', {})}</Badge>
-              )}
-            </TableData>
-
-            <TableData>
-              <FormattedTimestamp timestamp={subdomain.created} />
-            </TableData>
-          </TableRow>
+          <AdminSubdomainRow key={subdomain.uuid} subdomain={subdomain} onChanged={refetch} />
         ))}
       </Table>
     </>
