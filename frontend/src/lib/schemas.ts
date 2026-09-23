@@ -49,7 +49,7 @@ export type ExtensionSettings = z.infer<typeof extensionSettingsSchema>;
 export const domainSchema = z.object({
   uuid: z.string(),
   domain: z.string(),
-  provider: z.enum(['cloudflare', 'bunny']),
+  provider: z.enum(['cloudflare', 'bunny', 'powerdns']),
   zoneId: z.string(),
   enabled: z.boolean(),
   subdomainCount: z.number().int(),

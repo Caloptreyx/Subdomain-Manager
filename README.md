@@ -1,7 +1,8 @@
 # Subdomain Manager
 
 A [Calagopus Panel](https://calagopus.com) extension that lets users create and manage
-subdomains for their game servers (mainly Minecraft) through **Cloudflare** or **Bunny.net DNS**.
+subdomains for their game servers (mainly Minecraft) through **Cloudflare**, **Bunny.net DNS** or
+**PowerDNS**.
 
 Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
 
@@ -40,9 +41,13 @@ Extensions require the `:heavy` panel image (or a dev environment) — see the
 - **Domains** – add the domains users may choose from.
   - *Cloudflare*: Zone ID (zone overview page) + an API token with `Zone:DNS:Edit` on that zone.
   - *Bunny.net*: numeric DNS zone id (from the dashboard URL) + an account API key.
+  - *PowerDNS* (Authoritative, HTTP API enabled): zone name (e.g. `example.com`) + the webserver
+    URL (e.g. `http://10.0.0.2:8081`, must be reachable from the panel container) + the `api-key`.
+    The URL and key are stored together, so changing either requires entering both.
   Credentials are verified against the provider before saving and stored encrypted.
 - **Settings** – blacklist regexes, default subdomain limit for new servers, default record
-  templates and per-egg overrides. A TTL of `0` means "provider automatic".
+  templates and per-egg overrides. A TTL of `0` means "provider automatic" (300s on PowerDNS, which
+  has no automatic TTL).
 - **Subdomains** – searchable list of all subdomains with their servers. Admins can create
   subdomains on any server (not bound by the server limit or the name blacklist), move a subdomain
   to another allocation of its server, and delete it (with a forced delete if the DNS provider

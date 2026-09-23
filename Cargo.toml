@@ -1,8 +1,8 @@
 [package]
 name = "dev_caloptreyx_subdomains"
-description = "Create and manage subdomains for game servers via Cloudflare or Bunny DNS."
+description = "Create and manage subdomains for game servers via Cloudflare, Bunny or PowerDNS."
 authors = ["Caloptreyx"]
-version = "0.2.0"
+version = "0.3.0"
 edition = { workspace = true }
 
 [dependencies]

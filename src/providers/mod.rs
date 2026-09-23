@@ -1,10 +1,11 @@
 mod bunny;
 mod cloudflare;
+mod powerdns;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-/// DNS record types supported by both providers.
+/// DNS record types supported by every provider.
 /// (variant names are literal DNS record type names)
 #[allow(clippy::upper_case_acronyms)]
 #[derive(ToSchema, Serialize, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
@@ -60,6 +61,9 @@ pub fn build(
             zone_id, credential,
         )?)),
         "bunny" => Ok(Box::new(bunny::BunnyProvider::new(zone_id, credential)?)),
+        "powerdns" => Ok(Box::new(powerdns::PowerDnsProvider::new(
+            zone_id, credential,
+        )?)),
         _ => Err(anyhow::anyhow!("unknown dns provider `{provider}`")),
     }
 }

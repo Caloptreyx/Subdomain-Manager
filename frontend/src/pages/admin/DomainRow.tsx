@@ -146,10 +146,8 @@ export default function DomainRow({
             </TableData>
 
             <TableData>
-              <Badge color={domain.provider === 'cloudflare' ? 'orange' : 'blue'}>
-                {domain.provider === 'cloudflare'
-                  ? tExt('pages.admin.subdomains.domains.provider.cloudflare', {})
-                  : tExt('pages.admin.subdomains.domains.provider.bunny', {})}
+              <Badge color={{ cloudflare: 'orange', bunny: 'blue', powerdns: 'grape' }[domain.provider]}>
+                {tExt(`pages.admin.subdomains.domains.provider.${domain.provider}`, {})}
               </Badge>
             </TableData>
 

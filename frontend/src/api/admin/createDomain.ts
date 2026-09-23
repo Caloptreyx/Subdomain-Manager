@@ -5,7 +5,7 @@ import { type Domain, domainSchema, SUBDOMAIN_ADMIN_BASE } from '../../lib/schem
 
 export const createDomainSchema = z.object({
   domain: z.string().min(1),
-  provider: z.enum(['cloudflare', 'bunny']),
+  provider: z.enum(['cloudflare', 'bunny', 'powerdns']),
   zoneId: z.string().min(1),
   credential: z.string().min(1),
 });

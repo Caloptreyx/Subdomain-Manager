@@ -16,12 +16,24 @@ import updateDomain from '../../../api/admin/updateDomain.ts';
 import type { Domain } from '../../../lib/schemas.ts';
 import { useExtTranslations } from '../../../translations.ts';
 
-const domainFormSchema = z.object({
-  domain: z.string().min(1),
-  provider: z.enum(['cloudflare', 'bunny']),
-  zoneId: z.string().min(1),
-  credential: z.string(),
-});
+const domainFormSchema = z
+  .object({
+    domain: z.string().min(1),
+    provider: z.enum(['cloudflare', 'bunny', 'powerdns']),
+    zoneId: z.string().min(1),
+    // PowerDNS only; the URL and key are stored together as one credential,
+    // so they can only be changed together.
+    apiUrl: z.string(),
+    credential: z.string(),
+  })
+  .refine((values) => values.provider !== 'powerdns' || !values.credential.trim() || values.apiUrl.trim(), {
+    path: ['apiUrl'],
+    message: 'Required',
+  })
+  .refine((values) => values.provider !== 'powerdns' || !values.apiUrl.trim() || values.credential.trim(), {
+    path: ['credential'],
+    message: 'Required',
+  });
 
 type DomainFormValues = z.infer<typeof domainFormSchema>;
 
@@ -29,8 +41,17 @@ const emptyValues: DomainFormValues = {
   domain: '',
   provider: 'cloudflare',
   zoneId: '',
+  apiUrl: '',
   credential: '',
 };
+
+function packCredential(values: DomainFormValues): string {
+  const credential = values.credential.trim();
+  if (!credential || values.provider !== 'powerdns') {
+    return credential;
+  }
+  return JSON.stringify({ api_url: values.apiUrl.trim(), api_key: credential });
+}
 
 export default function DomainCreateOrUpdateModal({
   domain,
@@ -58,19 +79,21 @@ export default function DomainCreateOrUpdateModal({
             domain: domain.domain,
             provider: domain.provider,
             zoneId: domain.zoneId,
+            apiUrl: '',
             credential: '',
           }
         : undefined,
     onSubmit: async (values) => {
+      const credential = packCredential(values);
       if (editing) {
         await updateDomain(domain.uuid, {
           domain: values.domain,
           provider: values.provider,
           zoneId: values.zoneId,
-          ...(values.credential ? { credential: values.credential } : {}),
+          ...(credential ? { credential } : {}),
         });
       } else {
-        await createDomain(values);
+        await createDomain({ domain: values.domain, provider: values.provider, zoneId: values.zoneId, credential });
       }
       onSaved();
     },
@@ -107,6 +130,7 @@ export default function DomainCreateOrUpdateModal({
               label: tExt('pages.admin.subdomains.domains.provider.cloudflare', {}),
             },
             { value: 'bunny', label: tExt('pages.admin.subdomains.domains.provider.bunny', {}) },
+            { value: 'powerdns', label: tExt('pages.admin.subdomains.domains.provider.powerdns', {}) },
           ]}
           allowDeselect={false}
           {...form.getInputProps('provider')}
@@ -114,21 +138,37 @@ export default function DomainCreateOrUpdateModal({
 
         <TextInput
           withAsterisk
-          label={tExt('pages.admin.subdomains.domains.modal.form.zoneId', {})}
+          label={
+            provider === 'powerdns'
+              ? tExt('pages.admin.subdomains.domains.modal.form.zoneName', {})
+              : tExt('pages.admin.subdomains.domains.modal.form.zoneId', {})
+          }
           description={
-            provider === 'bunny'
-              ? tExt('pages.admin.subdomains.domains.modal.form.zoneIdBunny', {})
-              : tExt('pages.admin.subdomains.domains.modal.form.zoneIdCloudflare', {})
+            provider === 'powerdns'
+              ? tExt('pages.admin.subdomains.domains.modal.form.zoneIdPowerdns', {})
+              : provider === 'bunny'
+                ? tExt('pages.admin.subdomains.domains.modal.form.zoneIdBunny', {})
+                : tExt('pages.admin.subdomains.domains.modal.form.zoneIdCloudflare', {})
           }
           {...form.getInputProps('zoneId')}
         />
 
+        {provider === 'powerdns' && (
+          <TextInput
+            withAsterisk={!editing}
+            label={tExt('pages.admin.subdomains.domains.modal.form.apiUrl', {})}
+            description={tExt('pages.admin.subdomains.domains.modal.form.apiUrlPowerdns', {})}
+            placeholder={editing ? tExt('pages.admin.subdomains.domains.modal.form.apiUrlKeep', {}) : undefined}
+            {...form.getInputProps('apiUrl')}
+          />
+        )}
+
         <PasswordInput
           withAsterisk={!editing}
           label={
-            provider === 'bunny'
-              ? tExt('pages.admin.subdomains.domains.modal.form.credentialBunny', {})
-              : tExt('pages.admin.subdomains.domains.modal.form.credential', {})
+            provider === 'cloudflare'
+              ? tExt('pages.admin.subdomains.domains.modal.form.credential', {})
+              : tExt('pages.admin.subdomains.domains.modal.form.credentialApiKey', {})
           }
           placeholder={editing ? tExt('pages.admin.subdomains.domains.modal.form.credentialKeep', {}) : undefined}
           {...form.getInputProps('credential')}

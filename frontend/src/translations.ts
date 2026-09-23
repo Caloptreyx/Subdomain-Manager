@@ -94,6 +94,7 @@ const translations = defineTranslations({
             provider: {
               cloudflare: 'Cloudflare',
               bunny: 'Bunny.net',
+              powerdns: 'PowerDNS',
             },
             modal: {
               titleCreate: 'Add Domain',
@@ -104,8 +105,13 @@ const translations = defineTranslations({
                 zoneId: 'Zone ID',
                 zoneIdCloudflare: 'Zone ID from the zone overview.',
                 zoneIdBunny: 'Numeric DNS zone id from the URL.',
+                zoneName: 'Zone',
+                zoneIdPowerdns: 'Zone name as configured in PowerDNS, e.g. example.com',
+                apiUrl: 'API URL',
+                apiUrlPowerdns: 'PowerDNS webserver URL reachable from the panel, e.g. http://10.0.0.2:8081',
+                apiUrlKeep: 'leave empty to keep current (requires the API key when changed)',
                 credential: 'API Token',
-                credentialBunny: 'API Key',
+                credentialApiKey: 'API Key',
                 credentialKeep: 'leave empty to keep current',
               },
             },
