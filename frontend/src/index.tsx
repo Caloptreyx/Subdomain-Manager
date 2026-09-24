@@ -3,6 +3,7 @@ import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { Extension, ExtensionContext } from 'shared';
 import { z } from 'zod';
 import { type FieldDef, insertFieldsAfter } from '@/elements/form-engine/index.ts';
+import AllocationSubdomainAction from './components/AllocationSubdomainAction.tsx';
 import AdminConfigurationPage from './pages/admin/AdminConfigurationPage.tsx';
 import ServerSubdomainsPage from './pages/server/ServerSubdomainsPage.tsx';
 import { getExtTranslations } from './translations.ts';
@@ -20,6 +21,14 @@ class CaloptreyxSubdomainsExtension extends Extension {
         element: ServerSubdomainsPage,
         permission: 'subdomains.read',
       }),
+    );
+
+    ctx.extensionRegistry.enterPages((pages) =>
+      pages.enterServer((server) =>
+        server.enterNetwork((network) =>
+          network.enterAllocationContextMenu((menu) => menu.addComponentItemInterceptor(AllocationSubdomainAction)),
+        ),
+      ),
     );
 
     ctx.extensionRegistry.enterPermissionIcons((icons) =>

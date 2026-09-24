@@ -21,11 +21,13 @@ import { useExtTranslations } from '../../../translations.ts';
 export default function SubdomainCreateModal({
   serverUuid,
   domains,
+  allocationUuid: initialAllocationUuid,
   onCreated,
   ...props
 }: ModalProps & {
   serverUuid: string;
   domains: z.infer<typeof domainRefSchema>[];
+  allocationUuid?: string;
   onCreated: () => void;
 }) {
   const { t: tExt, tReact: tExtReact } = useExtTranslations();
@@ -42,6 +44,8 @@ export default function SubdomainCreateModal({
       setDomainUuid(null);
       setName('');
       setAllocationUuid(null);
+    } else if (initialAllocationUuid) {
+      setAllocationUuid(initialAllocationUuid);
     }
   }, [props.opened]);
 
