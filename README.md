@@ -85,6 +85,10 @@ Full schemas are in the panel's OpenAPI document once installed.
 
 - CLI command to migrate data from the Pterodactyl subdomain manager extension.
 
+## Support
+
+Need help or want to request a feature? Join the [Caloptreyx Discord](https://discord.gg/4qjMWU7S8x).
+
 ## License
 
 MIT

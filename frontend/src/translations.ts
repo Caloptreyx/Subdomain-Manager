@@ -68,6 +68,7 @@ const translations = defineTranslations({
       },
       admin: {
         subdomains: {
+          support: 'Support & feature requests',
           tabs: {
             domains: 'Domains',
             settings: 'Settings',
