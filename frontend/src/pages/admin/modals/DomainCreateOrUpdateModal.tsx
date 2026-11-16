@@ -11,9 +11,9 @@ import FormModal from '@/elements/modals/FormModal.tsx';
 import { ModalFooter } from '@/elements/modals/Modal.tsx';
 import { useModalForm } from '@/plugins/form/useModalForm.ts';
 import { useTranslations } from '@/providers/TranslationProvider.tsx';
+import type { Domain } from '../../../lib/schemas.ts';
 import createDomain from '../../../api/admin/createDomain.ts';
 import updateDomain from '../../../api/admin/updateDomain.ts';
-import type { Domain } from '../../../lib/schemas.ts';
 import { useExtTranslations } from '../../../translations.ts';
 
 const domainFormSchema = z

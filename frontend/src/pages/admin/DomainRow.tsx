@@ -12,10 +12,10 @@ import ContextMenu, { ContextMenuToggle } from '@/elements/overlays/ContextMenu.
 import FormattedTimestamp from '@/elements/time/FormattedTimestamp.tsx';
 import Code from '@/elements/typography/Code.tsx';
 import { useToast } from '@/providers/ToastProvider.tsx';
+import type { Domain } from '../../lib/schemas.ts';
 import deleteDomain from '../../api/admin/deleteDomain.ts';
 import updateDomain from '../../api/admin/updateDomain.ts';
 import verifyDomain from '../../api/admin/verifyDomain.ts';
-import type { Domain } from '../../lib/schemas.ts';
 import { useExtTranslations } from '../../translations.ts';
 import { adminDomainsQueryKey } from './DomainsTab.tsx';
 

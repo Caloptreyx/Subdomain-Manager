@@ -45,16 +45,14 @@ export default function AllocationSubdomainAction({
   }
 
   const added: ContextMenuItem[] = [
-    ...subdomains.map(
-      (subdomain): ContextMenuItem => ({
-        type: 'action',
-        icon: faGlobe,
-        label: subdomain.fqdn,
-        onClick: handleCopyToClipboard(subdomain.fqdn, addToast),
-        color: 'gray',
-        canAccess: canRead,
-      }),
-    ),
+    ...subdomains.map((subdomain): ContextMenuItem => ({
+      type: 'action',
+      icon: faGlobe,
+      label: subdomain.fqdn,
+      onClick: handleCopyToClipboard(subdomain.fqdn, addToast),
+      color: 'gray',
+      canAccess: canRead,
+    })),
     {
       type: 'action',
       icon: faPlus,

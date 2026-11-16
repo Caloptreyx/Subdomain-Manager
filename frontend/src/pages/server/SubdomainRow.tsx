@@ -1,7 +1,6 @@
 import { faLink, faTrash } from '@fortawesome/free-solid-svg-icons';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-
 import CopyOnClick from '@/elements/CopyOnClick.tsx';
 import Badge from '@/elements/data-display/Badge.tsx';
 import { TableData, TableRow } from '@/elements/data-display/Table.tsx';
@@ -12,9 +11,9 @@ import FormattedTimestamp from '@/elements/time/FormattedTimestamp.tsx';
 import Code from '@/elements/typography/Code.tsx';
 import { useServerCan } from '@/plugins/usePermissions.ts';
 import { useToast } from '@/providers/ToastProvider.tsx';
+import type { Subdomain } from '../../lib/schemas.ts';
 import deleteSubdomain from '../../api/server/deleteSubdomain.ts';
 import updateSubdomain from '../../api/server/updateSubdomain.ts';
-import type { Subdomain } from '../../lib/schemas.ts';
 import { useExtTranslations } from '../../translations.ts';
 import SubdomainAllocationModal from './modals/SubdomainAllocationModal.tsx';
 import SubdomainDeleteModal from './modals/SubdomainDeleteModal.tsx';

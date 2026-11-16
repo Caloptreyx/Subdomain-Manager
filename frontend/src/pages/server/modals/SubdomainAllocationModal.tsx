@@ -8,8 +8,8 @@ import { ModalFooter } from '@/elements/modals/Modal.tsx';
 import Text from '@/elements/typography/Text.tsx';
 import { useToast } from '@/providers/ToastProvider.tsx';
 import { useTranslations } from '@/providers/TranslationProvider.tsx';
-import AllocationSelect from '../../../components/AllocationSelect.tsx';
 import type { Subdomain } from '../../../lib/schemas.ts';
+import AllocationSelect from '../../../components/AllocationSelect.tsx';
 import { useExtTranslations } from '../../../translations.ts';
 
 export default function SubdomainAllocationModal({

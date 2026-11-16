@@ -18,10 +18,10 @@ import Text from '@/elements/typography/Text.tsx';
 import { queryKeys } from '@/lib/queryKeys.ts';
 import { useAdminCan } from '@/plugins/usePermissions.ts';
 import { useToast } from '@/providers/ToastProvider.tsx';
+import type { ExtensionSettings } from '../../lib/schemas.ts';
 import getSettings from '../../api/admin/getSettings.ts';
 import updateSettings from '../../api/admin/updateSettings.ts';
 import RecordTemplatesEditor from '../../components/RecordTemplatesEditor.tsx';
-import type { ExtensionSettings } from '../../lib/schemas.ts';
 import { useExtTranslations } from '../../translations.ts';
 
 export const adminSettingsQueryKey = ['dev.caloptreyx.subdomains', 'admin', 'settings'] as const;
