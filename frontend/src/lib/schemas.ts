@@ -36,6 +36,12 @@ export const extensionSettingsSchema = z.object({
   blacklist: z.array(z.string()),
   defaultLimit: z.number().int().min(0),
   defaultRecords: z.array(recordTemplateSchema),
+  nestRecords: z.array(
+    z.object({
+      nestUuid: z.string(),
+      records: z.array(recordTemplateSchema),
+    }),
+  ),
   eggRecords: z.array(
     z.object({
       eggUuid: z.string(),

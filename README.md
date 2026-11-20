@@ -12,9 +12,9 @@ Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
   DNS records and shows the resulting `name.domain`.
 - Seamless Minecraft integration: default record set is an address record plus a
   `_minecraft._tcp` SRV record, so players connect without typing a port.
-- **Per-egg record templates** with placeholders (`{name}`, `{domain}`, `{fqdn}`, `{ip}`, `{port}`,
-  `{server}`, `{server_name}`) – e.g. an A-only set for Minecraft Bedrock, or extra custom
-  A/AAAA/CNAME/TXT records.
+- **Per-nest and per-egg record templates** with placeholders (`{name}`, `{domain}`, `{fqdn}`,
+  `{ip}`, `{port}`, `{server}`, `{server_name}`) – e.g. one set for every egg in a Minecraft nest,
+  an A-only set for Minecraft Bedrock, or extra custom A/AAAA/CNAME/TXT records.
 - **IP alias parsing**: the allocation's alias is used as the record target; hostnames become CNAME,
   IPv4 becomes A, IPv6 becomes AAAA.
 - **Blacklist** subdomain names with regular expressions.
@@ -46,8 +46,9 @@ Extensions require the `:heavy` panel image (or a dev environment) — see the
     The URL and key are stored together, so changing either requires entering both.
   Credentials are verified against the provider before saving and stored encrypted.
 - **Settings** – blacklist regexes, default subdomain limit for new servers, default record
-  templates and per-egg overrides. A TTL of `0` means "provider automatic" (300s on PowerDNS, which
-  has no automatic TTL).
+  templates, per-nest overrides and per-egg overrides. A server's egg override wins, then its
+  nest's override, then the defaults. A TTL of `0` means "provider automatic" (300s on PowerDNS,
+  which has no automatic TTL).
 - **Subdomains** – searchable list of all subdomains with their servers. Admins can create
   subdomains on any server (not bound by the server limit or the name blacklist), move a subdomain
   to another allocation of its server, and delete it (with a forced delete if the DNS provider
@@ -61,8 +62,8 @@ Permissions: server `subdomains.read|create|update|delete`, admin `subdomains.re
 
 ![Admin domains tab](docs/screenshots/admin-domains.png)
 
-**Settings** – name blacklist, default subdomain limit, default record templates and per-egg
-overrides.
+**Settings** – name blacklist, default subdomain limit, default record templates and per-nest and
+per-egg overrides.
 
 ![Admin settings tab](docs/screenshots/admin-settings.png)
 

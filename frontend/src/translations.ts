@@ -138,10 +138,15 @@ const translations = defineTranslations({
               defaultLimit: 'Default Subdomain Limit',
               defaultLimitDescription: 'Subdomain limit applied to new servers unless overridden.',
               defaultRecords: 'Default Record Templates',
+              nestOverrides: 'Nest Overrides',
+              nestOverridesDescription:
+                'Override the record templates for servers using any egg of a nest. Egg overrides take precedence.',
+              addNestOverride: 'Add nest override',
               eggOverrides: 'Egg Overrides',
-              eggOverridesDescription: 'Override the record templates for servers using a specific egg.',
+              eggOverridesDescription:
+                'Override the record templates for servers using a specific egg. These win over nest overrides.',
               addEggOverride: 'Add egg override',
-              removeEggOverride: 'Remove',
+              removeOverride: 'Remove',
               egg: 'Egg',
             },
             templates: {

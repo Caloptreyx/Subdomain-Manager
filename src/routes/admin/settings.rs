@@ -96,6 +96,18 @@ mod put {
             }
         }
 
+        let mut seen_nests = HashSet::new();
+        for entry in &data.nest_records {
+            if !seen_nests.insert(entry.nest_uuid) {
+                return ApiResponse::error(format!(
+                    "duplicate nest override for nest {}",
+                    entry.nest_uuid
+                ))
+                .with_status(StatusCode::BAD_REQUEST)
+                .ok();
+            }
+        }
+
         let mut settings = state.settings.get_mut().await?;
         *settings.find_mut_extension_settings::<ExtensionSettingsData>()? = data.clone();
         settings.save().await?;
@@ -107,6 +119,7 @@ mod put {
                     "blacklist": data.blacklist,
                     "default_limit": data.default_limit,
                     "default_records": data.default_records.len(),
+                    "nest_records": data.nest_records.len(),
                     "egg_records": data.egg_records.len(),
                 }),
             )

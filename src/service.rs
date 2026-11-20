@@ -113,7 +113,7 @@ async fn server_allocation(
         .ok_or_else(|| bad_request("allocation does not belong to this server"))
 }
 
-/// Renders the egg's record templates for an allocation.
+/// Renders the server's record templates (egg, nest or default) for an allocation.
 async fn render_records(
     state: &State,
     server: &Server,
@@ -131,7 +131,9 @@ async fn render_records(
         server_name: server.name.to_string(),
     };
     records::render_records(
-        settings(state).await?.records_for_egg(server.egg.uuid),
+        settings(state)
+            .await?
+            .records_for(server.egg.uuid, server.nest.uuid),
         &vars,
         &target,
     )

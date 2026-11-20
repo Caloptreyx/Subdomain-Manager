@@ -69,6 +69,16 @@ pub struct EggRecords {
     pub records: Vec<RecordTemplate>,
 }
 
+/// Per-nest record template overrides, used for servers whose egg has no
+/// override of its own.
+#[derive(ToSchema, Validate, Serialize, Deserialize, Clone)]
+pub struct NestRecords {
+    #[garde(skip)]
+    pub nest_uuid: uuid::Uuid,
+    #[garde(dive)]
+    pub records: Vec<RecordTemplate>,
+}
+
 #[derive(ToSchema, Validate, Serialize, Deserialize, Clone)]
 pub struct ExtensionSettingsData {
     /// Regexes matched case-insensitively against requested subdomain names.
@@ -79,10 +89,14 @@ pub struct ExtensionSettingsData {
     #[garde(range(min = 0))]
     #[schema(minimum = 0)]
     pub default_limit: i32,
-    /// Record templates used for eggs without an override.
+    /// Record templates used for servers without an egg or nest override.
     #[garde(dive)]
     pub default_records: Vec<RecordTemplate>,
-    /// Per-egg record template overrides.
+    /// Per-nest record template overrides.
+    #[garde(dive)]
+    #[serde(default)]
+    pub nest_records: Vec<NestRecords>,
+    /// Per-egg record template overrides; these win over nest overrides.
     #[garde(dive)]
     pub egg_records: Vec<EggRecords>,
 }
@@ -111,6 +125,7 @@ impl Default for ExtensionSettingsData {
                     ttl: 0,
                 },
             ],
+            nest_records: Vec::new(),
             egg_records: Vec::new(),
         }
     }
@@ -131,13 +146,24 @@ impl ExtensionSettingsData {
             .collect()
     }
 
-    /// Record templates for the given egg, falling back to `default_records`.
-    pub fn records_for_egg(&self, egg_uuid: uuid::Uuid) -> &[RecordTemplate] {
-        self.egg_records
+    /// Record templates for a server: the egg override, else the nest
+    /// override, else `default_records`.
+    pub fn records_for(&self, egg_uuid: uuid::Uuid, nest_uuid: uuid::Uuid) -> &[RecordTemplate] {
+        if let Some(entry) = self
+            .egg_records
             .iter()
             .find(|entry| entry.egg_uuid == egg_uuid)
-            .map(|entry| entry.records.as_slice())
-            .unwrap_or(&self.default_records)
+        {
+            return &entry.records;
+        }
+        if let Some(entry) = self
+            .nest_records
+            .iter()
+            .find(|entry| entry.nest_uuid == nest_uuid)
+        {
+            return &entry.records;
+        }
+        &self.default_records
     }
 }
 
@@ -151,6 +177,7 @@ impl SettingsSerializeExt for ExtensionSettingsData {
             .write_serde_setting("blacklist", &self.blacklist)?
             .write_serde_setting("default_limit", &self.default_limit)?
             .write_serde_setting("default_records", &self.default_records)?
+            .write_serde_setting("nest_records", &self.nest_records)?
             .write_serde_setting("egg_records", &self.egg_records)?)
     }
 }
@@ -175,9 +202,79 @@ impl SettingsDeserializeExt for ExtensionSettingsDataDeserializer {
             default_records: deserializer
                 .read_serde_setting("default_records")
                 .unwrap_or(defaults.default_records),
+            nest_records: deserializer
+                .read_serde_setting("nest_records")
+                .unwrap_or(defaults.nest_records),
             egg_records: deserializer
                 .read_serde_setting("egg_records")
                 .unwrap_or(defaults.egg_records),
         }))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn address(name: &str) -> RecordTemplate {
+        RecordTemplate::Address {
+            name: name.to_string(),
+            proxied: false,
+            ttl: 0,
+        }
+    }
+
+    fn record_name(records: &[RecordTemplate]) -> &str {
+        match records {
+            [RecordTemplate::Address { name, .. }] => name,
+            _ => panic!("expected a single address template"),
+        }
+    }
+
+    #[test]
+    fn records_for_prefers_egg_then_nest_then_default() {
+        let nest = uuid::Uuid::from_u128(1);
+        let egg = uuid::Uuid::from_u128(2);
+        let sibling_egg = uuid::Uuid::from_u128(3);
+        let other_nest = uuid::Uuid::from_u128(4);
+
+        let settings = ExtensionSettingsData {
+            default_records: vec![address("default")],
+            nest_records: vec![NestRecords {
+                nest_uuid: nest,
+                records: vec![address("nest")],
+            }],
+            egg_records: vec![EggRecords {
+                egg_uuid: egg,
+                records: vec![address("egg")],
+            }],
+            ..Default::default()
+        };
+
+        assert_eq!(record_name(settings.records_for(egg, nest)), "egg");
+        assert_eq!(record_name(settings.records_for(sibling_egg, nest)), "nest");
+        assert_eq!(
+            record_name(settings.records_for(sibling_egg, other_nest)),
+            "default"
+        );
+    }
+
+    #[test]
+    fn records_for_keeps_an_empty_nest_override() {
+        let nest = uuid::Uuid::from_u128(1);
+        let settings = ExtensionSettingsData {
+            default_records: vec![address("default")],
+            nest_records: vec![NestRecords {
+                nest_uuid: nest,
+                records: Vec::new(),
+            }],
+            ..Default::default()
+        };
+
+        assert!(
+            settings
+                .records_for(uuid::Uuid::from_u128(2), nest)
+                .is_empty()
+        );
     }
 }

@@ -9,18 +9,17 @@ import TitleCard from '@/elements/data-display/TitleCard.tsx';
 import Alert from '@/elements/feedback/Alert.tsx';
 import Spinner from '@/elements/feedback/Spinner.tsx';
 import NumberInput from '@/elements/input/NumberInput.tsx';
-import Select from '@/elements/input/Select.tsx';
 import TagsInput from '@/elements/input/TagsInput.tsx';
 import Group from '@/elements/layout/Group.tsx';
 import Stack from '@/elements/layout/Stack.tsx';
 import Code from '@/elements/typography/Code.tsx';
-import Text from '@/elements/typography/Text.tsx';
 import { queryKeys } from '@/lib/queryKeys.ts';
 import { useAdminCan } from '@/plugins/usePermissions.ts';
 import { useToast } from '@/providers/ToastProvider.tsx';
 import type { ExtensionSettings } from '../../lib/schemas.ts';
 import getSettings from '../../api/admin/getSettings.ts';
 import updateSettings from '../../api/admin/updateSettings.ts';
+import RecordOverridesCard from '../../components/RecordOverridesCard.tsx';
 import RecordTemplatesEditor from '../../components/RecordTemplatesEditor.tsx';
 import { useExtTranslations } from '../../translations.ts';
 
@@ -64,14 +63,18 @@ export default function SettingsTab() {
     enabled: canReadEggs,
   });
 
-  const eggNames = useMemo(() => {
-    const map = new Map<string, string>();
+  const { nestNames, eggNames, eggNests } = useMemo(() => {
+    const nestNames = new Map<string, string>();
+    const eggNames = new Map<string, string>();
+    const eggNests = new Map<string, string>();
     for (const group of eggGroups ?? []) {
+      nestNames.set(group.nest.uuid, group.nest.name);
       for (const egg of group.eggs) {
-        map.set(egg.uuid, `${group.nest.name} / ${egg.name}`);
+        eggNames.set(egg.uuid, `${group.nest.name} / ${egg.name}`);
+        eggNests.set(egg.uuid, group.nest.uuid);
       }
     }
-    return map;
+    return { nestNames, eggNames, eggNests };
   }, [eggGroups]);
 
   const invalidPatterns = useMemo(() => invalidRegexes(settings?.blacklist ?? []), [settings?.blacklist]);
@@ -103,6 +106,11 @@ export default function SettingsTab() {
   }
 
   const update = (patch: Partial<ExtensionSettings>) => setSettings({ ...settings, ...patch });
+
+  const usedNestUuids = new Set(settings.nestRecords.map((entry) => entry.nestUuid));
+  const nestOptions = (eggGroups ?? [])
+    .filter((group) => !usedNestUuids.has(group.nest.uuid))
+    .map((group) => ({ label: group.nest.name, value: group.nest.uuid }));
 
   const usedEggUuids = new Set(settings.eggRecords.map((entry) => entry.eggUuid));
   const eggOptions = (eggGroups ?? [])
@@ -161,60 +169,64 @@ export default function SettingsTab() {
         />
       </TitleCard>
 
-      <TitleCard
-        title={tExt('pages.admin.subdomains.settings.form.eggOverrides', {})}
-        rightSection={
-          canReadEggs ? (
-            <Select
-              placeholder={tExt('pages.admin.subdomains.settings.form.addEggOverride', {})}
-              data={eggOptions}
-              value={null}
-              onChange={(eggUuid) => {
-                if (!eggUuid) return;
-                update({
-                  eggRecords: [...settings.eggRecords, { eggUuid, records: settings.defaultRecords }],
-                });
-              }}
-              disabled={!canManage}
-              searchable
-              w={260}
-            />
-          ) : undefined
+      <RecordOverridesCard
+        title={tExt('pages.admin.subdomains.settings.form.nestOverrides', {})}
+        description={tExt('pages.admin.subdomains.settings.form.nestOverridesDescription', {})}
+        addPlaceholder={tExt('pages.admin.subdomains.settings.form.addNestOverride', {})}
+        removeLabel={tExt('pages.admin.subdomains.settings.form.removeOverride', {})}
+        options={nestOptions}
+        overrides={settings.nestRecords.map((entry) => ({
+          key: entry.nestUuid,
+          label: nestNames.get(entry.nestUuid) ?? entry.nestUuid,
+          records: entry.records,
+        }))}
+        canAdd={canReadEggs}
+        disabled={!canManage}
+        onAdd={(nestUuid) =>
+          update({ nestRecords: [...settings.nestRecords, { nestUuid, records: settings.defaultRecords }] })
         }
-      >
-        <Stack gap='md'>
-          <Text size='sm' c='dimmed'>
-            {tExt('pages.admin.subdomains.settings.form.eggOverridesDescription', {})}
-          </Text>
+        onRemove={(index) => update({ nestRecords: settings.nestRecords.filter((_, i) => i !== index) })}
+        onChange={(index, records) =>
+          update({
+            nestRecords: settings.nestRecords.map((existing, i) => (i === index ? { ...existing, records } : existing)),
+          })
+        }
+      />
 
-          {settings.eggRecords.map((entry, index) => (
-            <Stack key={entry.eggUuid} gap='sm'>
-              <Group justify='space-between'>
-                <Text fw={600}>{eggNames.get(entry.eggUuid) ?? entry.eggUuid}</Text>
-                <Button
-                  variant='default'
-                  color='red'
-                  disabled={!canManage}
-                  onClick={() => update({ eggRecords: settings.eggRecords.filter((_, i) => i !== index) })}
-                >
-                  {tExt('pages.admin.subdomains.settings.form.removeEggOverride', {})}
-                </Button>
-              </Group>
-              <RecordTemplatesEditor
-                value={entry.records}
-                onChange={(records) =>
-                  update({
-                    eggRecords: settings.eggRecords.map((existing, i) =>
-                      i === index ? { ...existing, records } : existing,
-                    ),
-                  })
-                }
-                disabled={!canManage}
-              />
-            </Stack>
-          ))}
-        </Stack>
-      </TitleCard>
+      <RecordOverridesCard
+        title={tExt('pages.admin.subdomains.settings.form.eggOverrides', {})}
+        description={tExt('pages.admin.subdomains.settings.form.eggOverridesDescription', {})}
+        addPlaceholder={tExt('pages.admin.subdomains.settings.form.addEggOverride', {})}
+        removeLabel={tExt('pages.admin.subdomains.settings.form.removeOverride', {})}
+        options={eggOptions}
+        overrides={settings.eggRecords.map((entry) => ({
+          key: entry.eggUuid,
+          label: eggNames.get(entry.eggUuid) ?? entry.eggUuid,
+          records: entry.records,
+        }))}
+        canAdd={canReadEggs}
+        disabled={!canManage}
+        // A new egg override starts from what the egg gets today: its nest's template, else the default.
+        onAdd={(eggUuid) =>
+          update({
+            eggRecords: [
+              ...settings.eggRecords,
+              {
+                eggUuid,
+                records:
+                  settings.nestRecords.find((entry) => entry.nestUuid === eggNests.get(eggUuid))?.records ??
+                  settings.defaultRecords,
+              },
+            ],
+          })
+        }
+        onRemove={(index) => update({ eggRecords: settings.eggRecords.filter((_, i) => i !== index) })}
+        onChange={(index, records) =>
+          update({
+            eggRecords: settings.eggRecords.map((existing, i) => (i === index ? { ...existing, records } : existing)),
+          })
+        }
+      />
 
       <Group justify='flex-end'>
         <AdminCan action='subdomains.manage' cantSave>
