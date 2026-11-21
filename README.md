@@ -4,7 +4,7 @@ A [Calagopus Panel](https://calagopus.com) extension that lets users create and 
 subdomains for their game servers (mainly Minecraft) through **Cloudflare**, **Bunny.net DNS** or
 **PowerDNS**.
 
-Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
+Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.10`
 
 ## Features
 
@@ -22,6 +22,9 @@ Package name: `dev.caloptreyx.subdomains` · Requires panel `>=1.2.2`
   server create/update forms.
 - **Proper cleanup**: DNS records are removed when a subdomain, its server or its allocation is
   deleted, and when a server is transferred to another node.
+- **Leaves existing DNS records alone**: before creating records the extension asks the provider
+  whether each record name is free, and refuses (409) if the name already has records of any
+  type. It only ever deletes the records it created itself.
 - **Allocation changes at any time**; after a server transfer the allocation is set to `null`
   (Unknown) so the user can re-point the subdomain, which creates new records.
 - Admin overview of every subdomain across the panel, with search.

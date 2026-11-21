@@ -92,19 +92,12 @@ impl PowerDnsProvider {
             .header("X-API-Key", &self.key)
     }
 
-    /// Current records (PowerDNS content strings) and ttl of one RRset.
-    /// `Ok(None)` if the zone does not exist.
-    async fn rrset(
-        &self,
-        name: &str,
-        record_type: DnsRecordType,
-    ) -> anyhow::Result<Option<(Vec<String>, Option<u64>)>> {
-        let record_type = format!("{record_type:?}");
-        // Older PowerDNS versions ignore the filter and return every RRset,
-        // hence the client-side filter below.
+    /// The zone with its RRsets, filtered by `query` where the server
+    /// supports it. `Ok(None)` if the zone does not exist.
+    async fn zone(&self, query: &[(&str, &str)]) -> anyhow::Result<Option<serde_json::Value>> {
         let response = self
             .request(reqwest::Method::GET)
-            .query(&[("rrset_name", name), ("rrset_type", record_type.as_str())])
+            .query(query)
             .send()
             .await?;
 
@@ -115,7 +108,25 @@ impl PowerDnsProvider {
             return Err(Self::response_error(response).await);
         }
 
-        let body: serde_json::Value = response.json().await?;
+        Ok(Some(response.json().await?))
+    }
+
+    /// Current records (PowerDNS content strings) and ttl of one RRset.
+    /// `Ok(None)` if the zone does not exist.
+    async fn rrset(
+        &self,
+        name: &str,
+        record_type: DnsRecordType,
+    ) -> anyhow::Result<Option<(Vec<String>, Option<u64>)>> {
+        let record_type = format!("{record_type:?}");
+        // Older PowerDNS versions ignore the filter and return every RRset,
+        // hence the client-side filter below.
+        let Some(body) = self
+            .zone(&[("rrset_name", name), ("rrset_type", record_type.as_str())])
+            .await?
+        else {
+            return Ok(None);
+        };
         let Some(rrset) = body["rrsets"].as_array().and_then(|rrsets| {
             rrsets.iter().find(|rrset| {
                 rrset["type"] == record_type.as_str()
@@ -265,6 +276,21 @@ fn replace_rrset(
     })
 }
 
+/// Whether a zone response has an RRset with records (of any type) named
+/// `name` (canonical). RRsets that only carry comments don't count.
+fn has_records_named(zone: &serde_json::Value, name: &str) -> bool {
+    zone["rrsets"].as_array().is_some_and(|rrsets| {
+        rrsets.iter().any(|rrset| {
+            rrset["name"]
+                .as_str()
+                .is_some_and(|n| n.eq_ignore_ascii_case(name))
+                && rrset["records"]
+                    .as_array()
+                    .is_some_and(|records| !records.is_empty())
+        })
+    })
+}
+
 #[async_trait::async_trait]
 impl DnsProvider for PowerDnsProvider {
     async fn verify(&self) -> anyhow::Result<String> {
@@ -285,8 +311,21 @@ impl DnsProvider for PowerDnsProvider {
             .ok_or_else(|| anyhow::anyhow!("powerdns: zone response missing name"))
     }
 
+    async fn name_in_use(&self, fqdn: &str) -> anyhow::Result<bool> {
+        let name = canonical(fqdn);
+        // Older PowerDNS versions ignore the filter and return every RRset
+        let zone = self
+            .zone(&[("rrset_name", name.as_str())])
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("powerdns: zone not found"))?;
+        Ok(has_records_named(&zone, &name))
+    }
+
     // RRsets can only be replaced as a whole, so creating and deleting are
     // read-modify-write. Concurrent changes to the same name+type may race.
+    // Records are addressed by content, so an identical record that already
+    // exists is refused rather than adopted: deleting it later would remove
+    // a record this extension did not create.
     async fn create_record(&self, record: &DnsRecordInput) -> anyhow::Result<StoredRecord> {
         let name = canonical(&record.name);
         let content = record_content(record);
@@ -295,12 +334,16 @@ impl DnsProvider for PowerDnsProvider {
             .rrset(&name, record.record_type)
             .await?
             .ok_or_else(|| anyhow::anyhow!("powerdns: zone not found"))?;
-        if !contents
+        if contents
             .iter()
             .any(|existing| content_matches(record.record_type, existing, &content))
         {
-            contents.push(content.clone());
+            return Err(anyhow::anyhow!(
+                "powerdns: {:?} record {name} {content} already exists",
+                record.record_type
+            ));
         }
+        contents.push(content.clone());
 
         let ttl = if record.ttl == 0 { AUTO_TTL } else { record.ttl };
         self.patch(replace_rrset(&name, record.record_type, ttl.into(), &contents))
@@ -423,6 +466,27 @@ mod tests {
             "0 5 25565 mc.example.com."
         ));
         assert!(!content_matches(DnsRecordType::TXT, "\"A\"", "\"a\""));
+    }
+
+    #[test]
+    fn has_records_named_checks_every_type_but_skips_empty_rrsets() {
+        // older PowerDNS versions return every RRset, whatever the filter
+        let zone = serde_json::json!({
+            "name": "example.com.",
+            "rrsets": [
+                { "name": "Play.example.com.", "type": "A", "ttl": 300,
+                  "records": [{ "content": "198.51.100.1", "disabled": false }] },
+                { "name": "status.example.com.", "type": "TXT", "ttl": 300,
+                  "records": [{ "content": "\"x\"", "disabled": true }] },
+                { "name": "old.example.com.", "type": "A", "records": [],
+                  "comments": [{ "content": "kept", "account": "" }] },
+            ],
+        });
+        assert!(has_records_named(&zone, "play.example.com."));
+        assert!(has_records_named(&zone, "status.example.com."));
+        assert!(!has_records_named(&zone, "old.example.com."));
+        assert!(!has_records_named(&zone, "mc.example.com."));
+        assert!(!has_records_named(&serde_json::json!({}), "play.example.com."));
     }
 
     #[test]

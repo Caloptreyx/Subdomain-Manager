@@ -46,6 +46,10 @@ pub struct StoredRecord {
 pub trait DnsProvider: Send + Sync {
     /// Verifies the credentials and zone exist; returns the zone name.
     async fn verify(&self) -> anyhow::Result<String>;
+    /// Whether the zone already has a record of any type named `fqdn`.
+    /// Checked before creating, so the extension never adds records next to
+    /// ones it did not create (and so never deletes those either).
+    async fn name_in_use(&self, fqdn: &str) -> anyhow::Result<bool>;
     async fn create_record(&self, record: &DnsRecordInput) -> anyhow::Result<StoredRecord>;
     /// Deleting a record that no longer exists (404) counts as success.
     async fn delete_record(&self, id: &str) -> anyhow::Result<()>;

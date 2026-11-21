@@ -140,10 +140,41 @@ async fn render_records(
     .map_err(|err| bad_request(err.to_string()))
 }
 
+/// Refuses names that already have records at the provider: the extension
+/// only manages names it owns outright, so it never adds round-robin records
+/// to someone else's name and never deletes records it did not create.
+async fn ensure_names_free(
+    provider: &dyn DnsProvider,
+    record_inputs: &[DnsRecordInput],
+) -> Result<(), anyhow::Error> {
+    let mut names: Vec<&str> = Vec::with_capacity(record_inputs.len());
+    for record in record_inputs {
+        if !names.iter().any(|name| name.eq_ignore_ascii_case(&record.name)) {
+            names.push(&record.name);
+        }
+    }
+
+    for name in names {
+        let in_use = provider
+            .name_in_use(name)
+            .await
+            .map_err(|err| bad_request(format!("failed to check existing dns records: {err}")))?;
+        if in_use {
+            return Err(user_error(
+                format!("{name} already has dns records at the provider"),
+                StatusCode::CONFLICT,
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 async fn create_records_at(
     provider: &dyn DnsProvider,
     record_inputs: &[DnsRecordInput],
 ) -> Result<Vec<StoredRecord>, anyhow::Error> {
+    ensure_names_free(provider, record_inputs).await?;
     create_dns_records(provider, record_inputs)
         .await
         .map_err(|err| bad_request(format!("failed to create dns records: {err}")))

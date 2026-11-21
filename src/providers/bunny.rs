@@ -26,8 +26,8 @@ impl BunnyProvider {
             .header("AccessKey", &self.key)
     }
 
-    /// Fetches the zone's domain name (used for verify and relativizing names).
-    async fn zone_domain(&self) -> anyhow::Result<String> {
+    /// Fetches the zone, including its domain name and every record.
+    async fn zone(&self) -> anyhow::Result<serde_json::Value> {
         let response = self
             .request(reqwest::Method::GET, &format!("/dnszone/{}", self.zone_id))
             .send()
@@ -37,11 +37,12 @@ impl BunnyProvider {
             return Err(Self::response_error(response).await);
         }
 
-        let body: serde_json::Value = response.json().await?;
-        body["Domain"]
-            .as_str()
-            .map(str::to_string)
-            .ok_or_else(|| anyhow::anyhow!("bunny: zone response missing Domain"))
+        Ok(response.json().await?)
+    }
+
+    /// Fetches the zone's domain name (used for verify and relativizing names).
+    async fn zone_domain(&self) -> anyhow::Result<String> {
+        parse_zone_domain(&self.zone().await?)
     }
 
     /// Extracts the `Message` field from a failed Bunny response.
@@ -71,6 +72,29 @@ pub(crate) fn record_type_int(record_type: DnsRecordType) -> i64 {
         DnsRecordType::TXT => 3,
         DnsRecordType::SRV => 8,
     }
+}
+
+fn parse_zone_domain(zone: &serde_json::Value) -> anyhow::Result<String> {
+    zone["Domain"]
+        .as_str()
+        .map(str::to_string)
+        .ok_or_else(|| anyhow::anyhow!("bunny: zone response missing Domain"))
+}
+
+/// Whether a `GET /dnszone/{zone}` response has a record of any type named
+/// `fqdn`. Bunny lists records with zone-relative names.
+pub(crate) fn zone_has_name(zone: &serde_json::Value, fqdn: &str) -> anyhow::Result<bool> {
+    let domain = parse_zone_domain(zone)?.to_ascii_lowercase();
+    let name = relative_name(&fqdn.to_ascii_lowercase(), &domain);
+    let records = zone["Records"]
+        .as_array()
+        .ok_or_else(|| anyhow::anyhow!("bunny: zone response missing Records"))?;
+
+    Ok(records.iter().any(|record| {
+        record["Name"]
+            .as_str()
+            .is_some_and(|existing| existing.eq_ignore_ascii_case(&name))
+    }))
 }
 
 /// Converts an FQDN into a Bunny zone-relative record name. The zone apex is
@@ -107,6 +131,10 @@ pub(crate) fn create_body(record: &DnsRecordInput, zone_domain: &str) -> serde_j
 impl DnsProvider for BunnyProvider {
     async fn verify(&self) -> anyhow::Result<String> {
         self.zone_domain().await
+    }
+
+    async fn name_in_use(&self, fqdn: &str) -> anyhow::Result<bool> {
+        zone_has_name(&self.zone().await?, fqdn)
     }
 
     async fn create_record(&self, record: &DnsRecordInput) -> anyhow::Result<StoredRecord> {
@@ -176,6 +204,26 @@ mod tests {
     #[test]
     fn relative_name_foreign_is_untouched() {
         assert_eq!(relative_name("mc.other.net", "example.com"), "mc.other.net");
+    }
+
+    #[test]
+    fn zone_has_name_matches_any_type_case_insensitively() {
+        let zone = serde_json::json!({
+            "Domain": "Example.com",
+            "Records": [
+                { "Id": 1, "Type": 0, "Name": "status", "Value": "198.51.100.1" },
+                { "Id": 2, "Type": 3, "Name": "Node1", "Value": "x" },
+                { "Id": 3, "Type": 8, "Name": "_minecraft._tcp.play", "Value": "play.example.com" },
+                { "Id": 4, "Type": 0, "Name": "", "Value": "198.51.100.2" },
+            ],
+        });
+        assert!(zone_has_name(&zone, "status.example.com").unwrap());
+        assert!(zone_has_name(&zone, "node1.EXAMPLE.com").unwrap());
+        assert!(zone_has_name(&zone, "_minecraft._tcp.play.example.com").unwrap());
+        assert!(!zone_has_name(&zone, "play.example.com").unwrap());
+        assert!(!zone_has_name(&zone, "mc.example.com").unwrap());
+        let no_records = serde_json::json!({ "Domain": "example.com" });
+        assert!(zone_has_name(&no_records, "mc.example.com").is_err());
     }
 
     #[test]

@@ -109,6 +109,28 @@ impl DnsProvider for CloudflareProvider {
             .ok_or_else(|| anyhow::anyhow!("cloudflare: zone response missing name"))
     }
 
+    async fn name_in_use(&self, fqdn: &str) -> anyhow::Result<bool> {
+        // `name` is an exact match on the full record name
+        let response = self
+            .request(
+                reqwest::Method::GET,
+                &format!("/zones/{}/dns_records", self.zone_id),
+            )
+            .query(&[("name", fqdn), ("per_page", "5")])
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            return Err(Self::response_error(response).await);
+        }
+
+        let body: serde_json::Value = response.json().await?;
+        let records = body["result"]
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("cloudflare: list response missing result"))?;
+        Ok(!records.is_empty())
+    }
+
     async fn create_record(&self, record: &DnsRecordInput) -> anyhow::Result<StoredRecord> {
         let response = self
             .request(
