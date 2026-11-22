@@ -61,19 +61,18 @@ Permissions: server `subdomains.read|create|update|delete`, admin `subdomains.re
 
 ## Screenshots
 
-**Domains** – the DNS zones users can create subdomains on, with provider, status and usage.
+**Create Subdomain** – users pick a domain, a name and one of their server's allocations.
 
-![Admin domains tab](docs/screenshots/admin-domains.png)
+![Create Subdomain dialog](docs/screenshots/create-subdomain.png)
+
+**Add Domain** – admins add a DNS zone with its provider and credentials.
+
+![Add Domain dialog](docs/screenshots/add-domain.png)
 
 **Settings** – name blacklist, default subdomain limit, default record templates and per-nest and
 per-egg overrides.
 
 ![Admin settings tab](docs/screenshots/admin-settings.png)
-
-**Subdomains** – every subdomain across the panel with its server and allocation, and admin
-create / change allocation / delete actions.
-
-![Admin subdomains tab](docs/screenshots/admin-subdomains.png)
 
 ## API
 
