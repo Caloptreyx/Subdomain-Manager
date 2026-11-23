@@ -2,7 +2,7 @@
 name = "dev_caloptreyx_subdomains"
 description = "Create and manage subdomains for game servers via Cloudflare, Bunny or PowerDNS."
 authors = ["Caloptreyx"]
-version = "0.4.1"
+version = "0.4.2"
 edition = { workspace = true }
 
 [dependencies]
