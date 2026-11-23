@@ -10,7 +10,7 @@ import { getExtTranslations } from './translations.ts';
 
 class CaloptreyxSubdomainsExtension extends Extension {
   public cardConfigurationPage: React.FC | null = AdminConfigurationPage;
-  public cardIcon: React.ReactNode = <FontAwesomeIcon icon={faGlobe} />;
+  public cardIcon = <FontAwesomeIcon icon={faGlobe} />;
 
   public initialize(ctx: ExtensionContext): void {
     ctx.extensionRegistry.enterRoutes((routes) =>
